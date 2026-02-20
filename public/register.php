@@ -11,15 +11,21 @@ if (isLoggedIn()) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username'] ?? '';
-    $email = $_POST['email'] ?? '';
+    if (!\Src\Security\CSRF::verifyToken($_POST['csrf_token'] ?? '')) {
+        die("CSRF Token Validation Failed.");
+    }
+
+    $username = sanitize($_POST['username'] ?? '');
+    $email = filter_var($_POST['email'] ?? '', FILTER_SANITIZE_EMAIL);
     $password = $_POST['password'] ?? '';
-    $full_name = $_POST['full_name'] ?? '';
-    $address = $_POST['address'] ?? '';
-    $phone = $_POST['phone'] ?? '';
+    $full_name = sanitize($_POST['full_name'] ?? '');
+    $address = sanitize($_POST['address'] ?? '');
+    $phone = sanitize($_POST['phone'] ?? '');
 
     // Basic Validation
-    if (empty($username) || empty($email) || empty($password) || empty($full_name)) {
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Invalid email format.";
+    } elseif (empty($username) || empty($password) || empty($full_name)) {
         $error = "Please fill in all required fields.";
     } else {
         try {
@@ -52,21 +58,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - EcoTrack</title>
+    <!-- Use Google Fonts (Poppins & Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
 
 <div class="auth-wrapper">
     <div class="auth-box card" style="max-width: 500px;">
-        <h2 class="text-center mb-4" style="color: var(--secondary);">Resident Registration</h2>
+        <h2 class="text-center mb-4" style="color: white; font-weight: 700; letter-spacing: -0.5px;">Resident <span style="color: var(--secondary);">Registration</span></h2>
         
         <?php if ($error): ?>
-            <div style="background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 0.75rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+            <div style="background: rgba(239, 68, 68, 0.2); color: #fca5a5; padding: 0.75rem; border-radius: 0.75rem; margin-bottom: 1.5rem; text-align: center; border: 1px solid rgba(239, 68, 68, 0.3);">
                 <?= sanitize($error) ?>
             </div>
         <?php endif; ?>
 
         <form method="POST" action="">
+            <?= \Src\Security\CSRF::getField() ?>
             <div class="grid grid-cols-2" style="gap: 1rem;">
                 <div class="form-group">
                     <label>Username *</label>
@@ -98,12 +109,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="text" name="phone" class="form-control">
             </div>
 
-            <button type="submit" class="btn btn-primary" style="width: 100%; background-color: var(--secondary);">Create Account</button>
+            <button type="submit" class="btn btn-primary mt-2" style="width: 100%; font-size: 1rem; padding: 0.85rem; background: linear-gradient(135deg, var(--secondary), #ca8a04); box-shadow: 0 4px 15px rgba(234, 179, 8, 0.3);">Create Account</button>
         </form>
 
-        <div class="text-center mt-4">
-            <span style="color: var(--text-muted);">Already have an account?</span>
-            <a href="/index.php">Login here</a>
+        <div class="text-center mt-4" style="padding-top: 1rem; border-top: 1px solid var(--glass-border);">
+            <span style="color: var(--text-muted); font-size: 0.95rem;">Already have an account?</span>
+            <a href="/index.php" style="font-weight: 500; margin-left: 0.25rem; color: var(--secondary);">Login here</a>
         </div>
     </div>
 </div>

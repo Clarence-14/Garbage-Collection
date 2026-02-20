@@ -4,6 +4,28 @@
 // Define project root
 define('PROJECT_ROOT', dirname(__DIR__));
 
+// Start session if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Set secure HTTP headers
+header('X-Frame-Options: SAMEORIGIN');
+header('X-XSS-Protection: 1; mode=block');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+
+// Load environment variables from .env
+$envFile = PROJECT_ROOT . '/.env';
+if (file_exists($envFile)) {
+    $envVariables = parse_ini_file($envFile, false, INI_SCANNER_RAW);
+    if ($envVariables) {
+        foreach ($envVariables as $key => $value) {
+            $_ENV[$key] = $value;
+        }
+    }
+}
+
 // Load Config
 require_once PROJECT_ROOT . '/src/Config/Database.php';
 

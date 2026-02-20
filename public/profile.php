@@ -10,13 +10,16 @@ $user = $userModel->getUserById($_SESSION['user_id']);
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!\Src\Security\CSRF::verifyToken($_POST['csrf_token'] ?? '')) {
+        die("CSRF Token Validation Failed.");
+    }
     // Basic validation
     $data = [
-        'username' => $_POST['username'] ?? $user['username'],
-        'email' => $_POST['email'] ?? $user['email'],
-        'full_name' => $_POST['full_name'] ?? $user['full_name'],
-        'address' => $_POST['address'] ?? $user['address'],
-        'phone' => $_POST['phone'] ?? $user['phone'],
+        'username' => sanitize($_POST['username'] ?? $user['username']),
+        'email' => filter_var($_POST['email'] ?? $user['email'], FILTER_SANITIZE_EMAIL),
+        'full_name' => sanitize($_POST['full_name'] ?? $user['full_name']),
+        'address' => sanitize($_POST['address'] ?? $user['address']),
+        'phone' => sanitize($_POST['phone'] ?? $user['phone']),
         'role' => $user['role'] // Role cannot be changed by self
     ];
 
@@ -60,6 +63,7 @@ include __DIR__ . '/../templates/header.php';
         <?php endif; ?>
 
         <form method="POST">
+            <?= \Src\Security\CSRF::getField() ?>
             <div class="form-group">
                 <label>Role</label>
                 <input type="text" class="form-control" value="<?= strtoupper($user['role']) ?>" disabled style="opacity: 0.7; cursor: not-allowed;">
