@@ -27,7 +27,7 @@ foreach($reqStats as $stat) {
 }
 
 // Route Stats
-$routeStats = $db->query("SELECT status, COUNT(*) as count FROM collection_routes GROUP BY status")->fetchAll();
+$routeStats = $db->query("SELECT status, COUNT(*) as count FROM routes GROUP BY status")->fetchAll();
 $routeLabels = [];
 $routeData = [];
 foreach($routeStats as $stat) {

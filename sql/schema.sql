@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS users (
     full_name VARCHAR(100) NOT NULL,
     address TEXT, -- Nullable for admins/drivers, required for residents logically
     phone VARCHAR(20),
+    assigned_county VARCHAR(100), -- For driver geofencing
+    latitude DECIMAL(10, 8), -- For resident specific location
+    longitude DECIMAL(11, 8),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -34,7 +37,7 @@ CREATE TABLE IF NOT EXISTS routes (
     driver_id INT,
     schedule_id INT, -- Links to the zone/day definition
     collection_date DATE NOT NULL,
-    status ENUM('Pending', 'In Progress', 'Completed') DEFAULT 'Pending',
+    status ENUM('Pending', 'In Progress', 'Pending Verification', 'Completed', 'Disputed') DEFAULT 'Pending',
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (driver_id) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (schedule_id) REFERENCES schedules(id) ON DELETE CASCADE
@@ -46,7 +49,9 @@ CREATE TABLE IF NOT EXISTS service_requests (
     user_id INT NOT NULL,
     request_type ENUM('Missed Pickup', 'Bin Damage', 'Bulk Pickup', 'Other') NOT NULL,
     description TEXT,
-    status ENUM('Open', 'In Progress', 'Resolved', 'Rejected') DEFAULT 'Open',
+    status ENUM('Open', 'In Progress', 'Pending Verification', 'Resolved', 'Rejected', 'Disputed') DEFAULT 'Open',
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
     admin_notes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -62,13 +67,13 @@ CREATE TABLE IF NOT EXISTS logs (
 );
 
 -- SAMPLE DATA
-INSERT INTO users (username, email, password_hash, role, full_name, address) VALUES
-('admin', 'admin@gc.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'System Administrator', 'HQ'),
-('driver1', 'driver1@gc.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'driver', 'John Driver', NULL),
-('resident1', 'res1@gc.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'resident', 'Jane Resident', '123 Maple St, Zone A');
+INSERT INTO users (username, email, password_hash, role, full_name, address, assigned_county) VALUES
+('admin', 'admin@gc.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'System Administrator', 'HQ', NULL),
+('driver1', 'driver1@gc.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'driver', 'John Driver', NULL, 'Kahawa Sukari'),
+('resident1', 'res1@gc.local', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'resident', 'Jane Resident', 'Baringo Rd, Kahawa Sukari', NULL);
 -- Note: Password is 'password' for all
 
 INSERT INTO schedules (zone_name, collection_day, waste_type) VALUES
-('Zone A', 'Monday', 'General'),
-('Zone A', 'Wednesday', 'Recycling'),
-('Zone B', 'Tuesday', 'General');
+('Baringo Rd, Kahawa Sukari', 'Monday', 'General'),
+('Garissa Rd, Kahawa Sukari', 'Wednesday', 'Recycling'),
+('Engineers, Kahawa Sukari', 'Tuesday', 'General');

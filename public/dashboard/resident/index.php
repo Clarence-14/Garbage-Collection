@@ -10,6 +10,48 @@ $scheduleModel = new Schedule();
 $schedules = $scheduleModel->getAllSchedules();
 $user = $_SESSION['user'];
 
+// Find routes pending Verification that apply to this user's zone (simplification logic based on user's address/county)
+$db = \Src\Config\Database::getInstance()->getConnection();
+
+$uStmt = $db->prepare("SELECT address FROM users WHERE id = :id");
+$uStmt->execute(['id' => $user['id']]);
+$userLatest = $uStmt->fetch();
+$userAddress = $userLatest['address'] ?? '';
+
+$pendingRoutes = [];
+if (!empty($userAddress)) {
+    $stmt = $db->prepare("SELECT r.*, s.zone_name, s.waste_type 
+                          FROM routes r 
+                          JOIN schedules s ON r.schedule_id = s.id 
+                          WHERE r.status = 'Pending Verification' 
+                          AND :address LIKE CONCAT('%', s.zone_name, '%')");
+    $stmt->execute(['address' => $userAddress]);
+    $pendingRoutes = $stmt->fetchAll();
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if (!\Src\Security\CSRF::verifyToken($_POST['csrf_token'] ?? '')) {
+        die("CSRF Token Validation Failed.");
+    }
+    
+    $routeId = $_POST['route_id'];
+    $action = $_POST['action']; // 'verify' or 'dispute'
+    
+    $newStatus = ($action === 'verify') ? 'Completed' : 'Disputed';
+    $updateStmt = $db->prepare("UPDATE routes SET status = :status WHERE id = :id");
+    $updateStmt->execute(['status' => $newStatus, 'id' => $routeId]);
+    
+    // Log it
+    $logStmt = $db->prepare("INSERT INTO logs (user_id, action, details) VALUES (:uid, :act, :det)");
+    $logStmt->execute([
+        'uid' => $user['id'],
+        'act' => "Route $newStatus",
+        'det' => "Resident action: $action on route ID $routeId"
+    ]);
+    
+    redirect('/dashboard/resident/index.php?msg=' . urlencode('Verification status updated!'));
+}
+
 include __DIR__ . '/../../../templates/header.php';
 ?>
 
@@ -28,6 +70,39 @@ include __DIR__ . '/../../../templates/header.php';
             <p style="color: var(--text-muted); font-size: 0.9rem;">View statement and balance.</p>
         </a>
     </div>
+
+    <?php if(!empty($pendingRoutes)): ?>
+        <h2 class="mt-4" style="margin-top: 3rem; color: #facc15;">Action Required: Pick-up Verification</h2>
+        <div class="card glass mb-4" style="border: 1px solid rgba(250, 204, 21, 0.3);">
+            <p style="color: var(--text-muted); margin-bottom: 1.5rem;">The driver reported the following collections as complete. Please verify:</p>
+            <div class="grid grid-cols-1">
+                 <?php foreach ($pendingRoutes as $pr): ?>
+                    <div style="background: rgba(250, 204, 21, 0.05); padding: 1.25rem; border-radius: 0.75rem; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(250, 204, 21, 0.1);">
+                        <div>
+                            <strong style="font-size: 1.15rem; color: white; display: block; margin-bottom: 0.25rem;"><?= htmlspecialchars($pr['waste_type']) ?> Pick-up</strong>
+                            <div style="color: rgba(148, 163, 184, 0.8); font-size: 0.9rem;">
+                                <?= date('l, M j', strtotime($pr['collection_date'])) ?> &mdash; <?= htmlspecialchars($pr['zone_name']) ?>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <form method="POST" style="display: inline;">
+                                <?= \Src\Security\CSRF::getField() ?>
+                                <input type="hidden" name="route_id" value="<?= $pr['id'] ?>">
+                                <input type="hidden" name="action" value="dispute">
+                                <button type="submit" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; opacity: 0.8;">Dispute</button>
+                            </form>
+                            <form method="POST" style="display: inline;">
+                                <?= \Src\Security\CSRF::getField() ?>
+                                <input type="hidden" name="route_id" value="<?= $pr['id'] ?>">
+                                <input type="hidden" name="action" value="verify">
+                                <button type="submit" class="btn btn-primary" style="padding: 0.4rem 1rem; font-size: 0.85rem; background: #22c55e;">Confirm Pick-up</button>
+                            </form>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <h2 class="mt-4" style="margin-top: 3rem;">Collection Schedule</h2>
     <div class="card glass mb-4">

@@ -8,7 +8,8 @@ Auth::requireRole('driver');
 $user = $_SESSION['user'];
 
 $routeModel = new Route();
-$routes = $routeModel->getRoutesByDriver($user['id']);
+$driverCounty = isset($user['assigned_county']) ? $user['assigned_county'] : null;
+$routes = $routeModel->getRoutesByDriver($user['id'], $driverCounty);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!\Src\Security\CSRF::verifyToken($_POST['csrf_token'] ?? '')) {
@@ -39,8 +40,17 @@ include __DIR__ . '/../../../templates/header.php';
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Center map (fallback coordinates)
-            var map = L.map('routeMap').setView([-1.2921, 36.8219], 12);
+            // Scale down specifically to Kahawa Sukari
+            var kahawaBounds = [
+                [-1.215, 36.910], // Southwest
+                [-1.175, 36.950]  // Northeast
+            ];
+
+            var map = L.map('routeMap', {
+                maxBounds: kahawaBounds,
+                maxBoundsViscosity: 1.0,
+                minZoom: 13
+            }).setView([-1.1910, 36.9287], 14);
 
             // Dark theme tiles for glassmorphism layout
             L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -51,9 +61,9 @@ include __DIR__ . '/../../../templates/header.php';
 
             <?php foreach($routes as $r): ?>
                 <?php if ($r['status'] !== 'Completed'): ?>
-                    // Simulated coordinates around center
-                    var lat = -1.2921 + (Math.random() - 0.5) * 0.08;
-                    var lng = 36.8219 + (Math.random() - 0.5) * 0.08;
+                    // Simulated coordinates around Kahawa Sukari
+                    var lat = -1.1910 + (Math.random() - 0.5) * 0.02;
+                    var lng = 36.9287 + (Math.random() - 0.5) * 0.02;
                     var marker = L.marker([lat, lng]).addTo(map);
                     marker.bindPopup("<strong style='color:black;'><?= addslashes((string)$r['zone_name']) ?></strong><br>Status: <?= $r['status'] ?>");
                 <?php endif; ?>
@@ -76,16 +86,18 @@ include __DIR__ . '/../../../templates/header.php';
                     </div>
                 </div>
 
-                <?php if ($r['status'] !== 'Completed'): ?>
+                <?php if ($r['status'] !== 'Completed' && $r['status'] !== 'Pending Verification'): ?>
                     <form method="POST" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1);">
                         <?= \Src\Security\CSRF::getField() ?>
                         <input type="hidden" name="route_id" value="<?= $r['id'] ?>">
                         <?php if ($r['status'] === 'Pending'): ?>
                             <button name="status" value="In Progress" class="btn btn-primary" style="width: 100%; background: linear-gradient(135deg, #eab308, #ca8a04); box-shadow: 0 4px 15px rgba(234, 179, 8, 0.3); font-weight: 600;">Start Route</button>
                         <?php else: ?>
-                            <button name="status" value="Completed" class="btn btn-primary" style="width: 100%; background: linear-gradient(135deg, #22c55e, #16a34a); box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3); font-weight: 600;">Mark Completed</button>
+                            <button name="status" value="Pending Verification" class="btn btn-primary" style="width: 100%; background: linear-gradient(135deg, #3b82f6, #2563eb); box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3); font-weight: 600;">Confirm Pickup (Awaiting Resident)</button>
                         <?php endif; ?>
                     </form>
+                <?php elseif ($r['status'] === 'Pending Verification'): ?>
+                    <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); color: #60a5fa; font-weight: bold; text-align: center; font-size: 1.1rem; letter-spacing: 0.5px;">⏳ Waiting for Resident Verification</div>
                 <?php else: ?>
                     <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); color: #4ade80; font-weight: bold; text-align: center; font-size: 1.1rem; letter-spacing: 0.5px;">✓ Completed</div>
                 <?php endif; ?>

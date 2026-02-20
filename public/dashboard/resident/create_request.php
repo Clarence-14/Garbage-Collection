@@ -15,18 +15,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     $type = $_POST['type'] ?? '';
     $description = $_POST['description'] ?? '';
+    $latitude = !empty($_POST['latitude']) ? (float)$_POST['latitude'] : null;
+    $longitude = !empty($_POST['longitude']) ? (float)$_POST['longitude'] : null;
     
-    if ($type && $description) {
+    if ($type && $description && $latitude && $longitude) {
         $reqModel = new ServiceRequest();
-        $reqModel->createRequest($_SESSION['user_id'], $type, $description);
+        $reqModel->createRequest($_SESSION['user_id'], $type, $description, $latitude, $longitude);
         $success = "Request submitted successfully.";
     } else {
-        $error = "Please fill all fields.";
+        $error = "Please fill all fields and select your location on the map.";
     }
 }
 
 include __DIR__ . '/../../../templates/header.php';
 ?>
+
+<!-- Leaflet CSS & JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
 <div class="container mt-4">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 2rem;">
@@ -63,12 +69,75 @@ include __DIR__ . '/../../../templates/header.php';
                 </div>
                 
                 <div class="form-group">
+                    <label style="color: white; margin-bottom: 0.5rem; display: block;">Exact Location <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">(Click map to drop pin)</span></label>
+                    <div id="requestMap" style="height: 300px; width: 100%; border-radius: 0.5rem; border: 1px solid rgba(255,255,255,0.1); margin-bottom: 1rem; z-index: 1;"></div>
+                    <input type="hidden" name="latitude" id="latInput" required>
+                    <input type="hidden" name="longitude" id="lngInput" required>
+                    <div id="locationStatus" style="color: #fca5a5; font-size: 0.85rem; margin-top: 0.5rem;">⚠️ No location selected yet. Drop a pin on the map.</div>
+                </div>
+
+                <div class="form-group">
                     <label style="color: white;">Description</label>
                     <textarea name="description" class="form-control" rows="4" placeholder="Please provide details..." style="resize: vertical;"></textarea>
                 </div>
                 
                 <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Submit Request</button>
             </form>
+            
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Set boundaries strictly to Kahawa Sukari area
+                    var kahawaBounds = [
+                        [-1.215, 36.910], // Southwest
+                        [-1.175, 36.950]  // Northeast
+                    ];
+
+                    var map = L.map('requestMap', {
+                        maxBounds: kahawaBounds,
+                        maxBoundsViscosity: 1.0,
+                        minZoom: 13
+                    }).setView([-1.1910, 36.9287], 15);
+                    
+                    var marker;
+
+                    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+                        maxZoom: 20
+                    }).addTo(map);
+
+                    // If browser supports Geolocation, center the map there initially (only if within bounds)
+                    if ("geolocation" in navigator) {
+                        navigator.geolocation.getCurrentPosition(function(position) {
+                            var userLat = position.coords.latitude;
+                            var userLng = position.coords.longitude;
+                            
+                            // Basic check if they are in Kahawa
+                            if(userLat > -1.215 && userLat < -1.175 && userLng > 36.910 && userLng < 36.950) {
+                                map.setView([userLat, userLng], 16);
+                            }
+                        });
+                    }
+
+                    // Click event to place pin
+                    map.on('click', function(e) {
+                        var lat = e.latlng.lat;
+                        var lng = e.latlng.lng;
+
+                        if (marker) {
+                            map.removeLayer(marker);
+                        }
+                        
+                        marker = L.marker([lat, lng]).addTo(map);
+                        
+                        document.getElementById('latInput').value = lat;
+                        document.getElementById('lngInput').value = lng;
+                        
+                        var statusEl = document.getElementById('locationStatus');
+                        statusEl.innerText = '✅ Location grabbed successfully.';
+                        statusEl.style.color = '#4ade80';
+                    });
+                });
+            </script>
         <?php endif; ?>
     </div>
 </div>

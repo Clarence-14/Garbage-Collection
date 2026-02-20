@@ -22,14 +22,25 @@ class Route {
     }
 
     // For Driver: Get assigned routes for today/future
-    public function getRoutesByDriver($driverId) {
+    public function getRoutesByDriver($driverId, $driverCounty = null) {
         $sql = "SELECT r.*, s.zone_name, s.waste_type, s.description 
                 FROM routes r
                 JOIN schedules s ON r.schedule_id = s.id
-                WHERE r.driver_id = :driver_id
-                ORDER BY r.collection_date, r.status";
+                WHERE r.driver_id = :driver_id";
+        
+        if ($driverCounty) {
+            $sql .= " AND s.zone_name LIKE :county";
+        }
+        
+        $sql .= " ORDER BY r.collection_date, r.status";
         $stmt = $this->db->prepare($sql);
-        $stmt->execute(['driver_id' => $driverId]);
+        
+        $params = ['driver_id' => $driverId];
+        if ($driverCounty) {
+            $params['county'] = '%' . $driverCounty . '%';
+        }
+        
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 

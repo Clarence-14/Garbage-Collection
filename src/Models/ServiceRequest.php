@@ -26,12 +26,14 @@ class ServiceRequest {
         return $stmt->fetchAll();
     }
 
-    public function createRequest($userId, $type, $description) {
-        $stmt = $this->db->prepare("INSERT INTO service_requests (user_id, request_type, description) VALUES (:user_id, :type, :description)");
+    public function createRequest($userId, $type, $description, $latitude = null, $longitude = null) {
+        $stmt = $this->db->prepare("INSERT INTO service_requests (user_id, request_type, description, latitude, longitude) VALUES (:user_id, :type, :description, :lat, :lng)");
         return $stmt->execute([
             'user_id' => $userId,
             'type' => $type,
-            'description' => $description
+            'description' => $description,
+            'lat' => $latitude,
+            'lng' => $longitude
         ]);
     }
 
